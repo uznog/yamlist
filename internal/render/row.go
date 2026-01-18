@@ -76,6 +76,16 @@ func (r *RowRenderer) FormatRow(row *model.VisibleRow, width int) string {
 
 	// Apply row-level styling
 	if row.IsSelected {
+		// Add accent marker at start (replace first char with accent)
+		accent := r.Styles.SelectionAccent.Render("▌")
+		if len(content) > 0 {
+			// Replace first character (usually a space) with accent marker
+			runes := []rune(content)
+			content = accent + string(runes[1:])
+		} else {
+			content = accent
+		}
+
 		// Pad to full width for selection highlight
 		contentWidth := lipglossWidth(content)
 		if contentWidth < width {
@@ -98,16 +108,11 @@ func (r *RowRenderer) formatScalarValue(value string, scalarType model.ScalarTyp
 		// Handle multiline FIRST (before truncation)
 		if strings.Contains(displayValue, "\n") {
 			lines := strings.Split(displayValue, "\n")
-			firstLine := strings.TrimSpace(lines[0])
 			if len(lines) > 1 {
-				// Truncate first line if needed, then add line count
-				maxFirstLine := 35
-				if runeCount(firstLine) > maxFirstLine {
-					firstLine = truncateRunes(firstLine, maxFirstLine-3) + "..."
-				}
-				displayValue = firstLine + fmt.Sprintf(" (+%d lines)", len(lines)-1)
+				// Show line count summary for multiline values
+				displayValue = fmt.Sprintf("[%d lines]", len(lines))
 			} else {
-				displayValue = firstLine
+				displayValue = strings.TrimSpace(lines[0])
 			}
 		}
 

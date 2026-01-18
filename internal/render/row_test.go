@@ -22,12 +22,12 @@ func TestFormatScalarValue_Multiline(t *testing.T) {
 		value    string
 		expected string // substring that must be present
 	}{
-		{"folded", "Line 1\nLine 2\nLine 3", "(+2 lines)"},
-		{"literal", "#!/bin/bash\nset -e\necho hello", "(+2 lines)"},
+		{"folded", "Line 1\nLine 2\nLine 3", "[3 lines]"},
+		{"literal", "#!/bin/bash\nset -e\necho hello", "[3 lines]"},
 		{"escaped_newlines", "single\\nline", "single\\nline"}, // not actual newline
 		{"no_newlines", "simple value", "simple value"},
-		{"single_line_with_trailing_newline", "just one\n", "(+1 lines)"},
-		{"many_lines", "a\nb\nc\nd\ne\nf", "(+5 lines)"},
+		{"single_line_with_trailing_newline", "just one\n", "[2 lines]"},
+		{"many_lines", "a\nb\nc\nd\ne\nf", "[6 lines]"},
 	}
 
 	for _, tt := range tests {

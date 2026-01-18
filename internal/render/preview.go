@@ -59,7 +59,13 @@ func (p *PreviewRenderer) formatTypeInfo(node *model.Node) string {
 	case model.KindList:
 		return fmt.Sprintf("list (%d items)", len(node.Children))
 	case model.KindScalar:
-		return fmt.Sprintf("scalar (%s)", node.ScalarType.String())
+		typeStr := fmt.Sprintf("scalar (%s)", node.ScalarType.String())
+		// Add line count for string values
+		if node.ScalarType == model.ScalarString && strings.Contains(node.ScalarValue, "\n") {
+			lineCount := strings.Count(node.ScalarValue, "\n") + 1
+			typeStr += fmt.Sprintf(" · %d lines", lineCount)
+		}
+		return typeStr
 	default:
 		return "unknown"
 	}

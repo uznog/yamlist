@@ -20,6 +20,7 @@ const (
 type Config struct {
 	UseIcons        bool
 	MaxPreviewLines int
+	Theme           string // "auto", "dark", "mono"
 }
 
 // DefaultConfig returns the default configuration
@@ -27,6 +28,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		UseIcons:        true,
 		MaxPreviewLines: 200,
+		Theme:           "auto",
 	}
 }
 
@@ -79,7 +81,7 @@ func NewModel(doc *yamlparse.Document, config *Config) *Model {
 		icons = render.ASCIIIcons()
 	}
 
-	styles := render.DefaultStyles()
+	styles := render.StylesForTheme(render.Theme(config.Theme))
 
 	// Initialize search input
 	ti := textinput.New()
