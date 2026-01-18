@@ -3,7 +3,7 @@ package yamlparse
 import (
 	"testing"
 
-	"github.com/vznog/yamlist/internal/model"
+	"github.com/uznog/yamlist/internal/model"
 )
 
 func TestParseString_Simple(t *testing.T) {

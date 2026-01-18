@@ -3,9 +3,9 @@ package tui
 import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/vznog/yamlist/internal/model"
-	"github.com/vznog/yamlist/internal/render"
-	"github.com/vznog/yamlist/internal/yamlparse"
+	"github.com/uznog/yamlist/internal/model"
+	"github.com/uznog/yamlist/internal/render"
+	"github.com/uznog/yamlist/internal/yamlparse"
 )
 
 // Mode represents the current UI mode

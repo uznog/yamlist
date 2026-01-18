@@ -1,6 +1,6 @@
 package render
 
-import "github.com/vznog/yamlist/internal/model"
+import "github.com/uznog/yamlist/internal/model"
 
 // IconSet defines the icons used for rendering
 type IconSet struct {

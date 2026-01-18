@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vznog/yamlist/internal/model"
+	"github.com/uznog/yamlist/internal/model"
 )
 
 // stripANSI removes ANSI escape codes from a string

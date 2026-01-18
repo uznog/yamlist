@@ -1,4 +1,4 @@
-module github.com/vznog/yamlist
+module github.com/uznog/yamlist
 
 go 1.21
 

@@ -1,6 +1,6 @@
 package yamlparse
 
-import "github.com/vznog/yamlist/internal/model"
+import "github.com/uznog/yamlist/internal/model"
 
 // Document represents a parsed YAML document
 type Document struct {

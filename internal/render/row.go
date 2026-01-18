@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/vznog/yamlist/internal/model"
+	"github.com/uznog/yamlist/internal/model"
 )
 
 // RowRenderer handles rendering of tree rows

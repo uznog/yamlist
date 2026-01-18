@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"github.com/vznog/yamlist/internal/model"
+	"github.com/uznog/yamlist/internal/model"
 	"github.com/sahilm/fuzzy"
 )
 

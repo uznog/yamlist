@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/vznog/yamlist/internal/model"
+	"github.com/uznog/yamlist/internal/model"
 )
 
 // PreviewRenderer handles rendering of the preview pane

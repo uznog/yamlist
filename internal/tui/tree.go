@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"github.com/vznog/yamlist/internal/model"
+	"github.com/uznog/yamlist/internal/model"
 )
 
 // computeVisibleRows rebuilds the visible rows list based on current expansion state
