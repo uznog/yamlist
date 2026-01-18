@@ -1,0 +1,149 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: large-config
+  namespace: performance-test
+data:
+  items:
+    - id: 1
+      name: Item 1
+      description: Description for item 1
+      category: A
+      tags: [tag1, tag2]
+      metadata:
+        created: 2024-01-01
+        updated: 2024-01-15
+    - id: 2
+      name: Item 2
+      description: Description for item 2
+      category: B
+      tags: [tag2, tag3]
+      metadata:
+        created: 2024-01-02
+        updated: 2024-01-16
+    - id: 3
+      name: Item 3
+      description: Description for item 3
+      category: A
+      tags: [tag1, tag3]
+      metadata:
+        created: 2024-01-03
+        updated: 2024-01-17
+    - id: 4
+      name: Item 4
+      description: Description for item 4
+      category: C
+      tags: [tag1, tag2, tag3]
+      metadata:
+        created: 2024-01-04
+        updated: 2024-01-18
+    - id: 5
+      name: Item 5
+      description: Description for item 5
+      category: B
+      tags: [tag2]
+      metadata:
+        created: 2024-01-05
+        updated: 2024-01-19
+    - id: 6
+      name: Item 6
+      description: Description for item 6
+      category: A
+      tags: [tag1, tag2]
+      metadata:
+        created: 2024-01-06
+        updated: 2024-01-20
+    - id: 7
+      name: Item 7
+      description: Description for item 7
+      category: C
+      tags: [tag3]
+      metadata:
+        created: 2024-01-07
+        updated: 2024-01-21
+    - id: 8
+      name: Item 8
+      description: Description for item 8
+      category: B
+      tags: [tag1, tag2, tag3]
+      metadata:
+        created: 2024-01-08
+        updated: 2024-01-22
+    - id: 9
+      name: Item 9
+      description: Description for item 9
+      category: A
+      tags: [tag2, tag3]
+      metadata:
+        created: 2024-01-09
+        updated: 2024-01-23
+    - id: 10
+      name: Item 10
+      description: Description for item 10
+      category: C
+      tags: [tag1]
+      metadata:
+        created: 2024-01-10
+        updated: 2024-01-24
+
+  settings:
+    performance:
+      maxConnections: 100
+      timeout: 30
+      retryCount: 3
+      bufferSize: 4096
+    logging:
+      level: info
+      format: json
+      output: stdout
+      rotation:
+        maxSize: 100MB
+        maxFiles: 10
+        compress: true
+    features:
+      featureA:
+        enabled: true
+        config:
+          threshold: 0.5
+          limit: 1000
+      featureB:
+        enabled: false
+        config:
+          threshold: 0.75
+          limit: 500
+      featureC:
+        enabled: true
+        config:
+          threshold: 0.9
+          limit: 250
+
+  environments:
+    development:
+      host: dev.example.com
+      port: 3000
+      debug: true
+      database:
+        host: localhost
+        port: 5432
+        name: dev_db
+    staging:
+      host: staging.example.com
+      port: 8080
+      debug: false
+      database:
+        host: staging-db.example.com
+        port: 5432
+        name: staging_db
+    production:
+      host: api.example.com
+      port: 443
+      debug: false
+      database:
+        host: prod-db.example.com
+        port: 5432
+        name: prod_db
+        replicas:
+          - host: replica1.example.com
+            port: 5432
+          - host: replica2.example.com
+            port: 5432

@@ -1,0 +1,46 @@
+users:
+  - name: Alice
+    age: 28
+    roles:
+      - admin
+      - developer
+  - name: Bob
+    age: 32
+    roles:
+      - viewer
+  - name: Charlie
+    age: 25
+    roles:
+      - developer
+      - tester
+
+servers:
+  - host: server1.example.com
+    port: 8080
+    tags:
+      - production
+      - primary
+  - host: server2.example.com
+    port: 8080
+    tags:
+      - production
+      - secondary
+  - host: server3.example.com
+    port: 8080
+    tags:
+      - staging
+
+simple_list:
+  - item1
+  - item2
+  - item3
+  - item4
+  - item5
+
+mixed_list:
+  - string value
+  - 42
+  - true
+  - null
+  - nested:
+      key: value

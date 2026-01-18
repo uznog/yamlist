@@ -1,0 +1,43 @@
+description: |
+  This is a multiline string that
+  preserves newlines exactly as written.
+
+  It can have blank lines too.
+
+  And it continues until the next key.
+
+folded_text: >
+  This is a folded string where
+  newlines become spaces, making
+  it easier to write long paragraphs
+  without manual line breaks.
+
+code_block: |
+  function hello() {
+    console.log("Hello, World!");
+    return true;
+  }
+
+script: |
+  #!/bin/bash
+  set -e
+
+  echo "Starting deployment..."
+
+  for i in 1 2 3; do
+    echo "Step $i"
+    sleep 1
+  done
+
+  echo "Done!"
+
+inline_multiline: "This is a regular string\nwith escaped newlines\nfor comparison."
+
+json_string: |
+  {
+    "name": "example",
+    "version": "1.0.0",
+    "dependencies": {
+      "lodash": "^4.17.21"
+    }
+  }
