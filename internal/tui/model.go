@@ -134,7 +134,31 @@ func NewModel(doc *yamlparse.Document, config *Config, nvimClient *nvim.Client) 
 
 // Init implements tea.Model
 func (m *Model) Init() tea.Cmd {
+	// Start reading cursor updates from Neovim if connected
+	if m.NvimClient != nil && m.NvimClient.IsConnected() {
+		m.NvimClient.StartReader()
+		// Return a command that waits for cursor updates from Neovim
+		return m.waitForCursorUpdate()
+	}
 	return nil
+}
+
+// waitForCursorUpdate returns a command that waits for cursor updates from Neovim
+func (m *Model) waitForCursorUpdate() tea.Cmd {
+	return func() tea.Msg {
+		if m.NvimClient == nil {
+			return nil
+		}
+		cursorChan := m.NvimClient.CursorUpdates()
+		if cursorChan == nil {
+			return nil
+		}
+		line, ok := <-cursorChan
+		if !ok {
+			return nil
+		}
+		return nvim.CursorUpdateMsg{Line: line}
+	}
 }
 
 // Update implements tea.Model
@@ -148,6 +172,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Height = msg.Height
 		m.updateLayout()
 		return m, nil
+
+	case nvim.CursorUpdateMsg:
+		// Find node closest to this line and select it
+		m.jumpToClosestLine(msg.Line)
+		// Keep listening for more cursor updates
+		return m, m.waitForCursorUpdate()
 	}
 
 	// Update search input if in search mode

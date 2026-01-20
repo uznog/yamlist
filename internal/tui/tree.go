@@ -339,3 +339,42 @@ func (m *Model) goToBottom() {
 	m.ensureSelectedVisible()
 	m.notifyLineChange()
 }
+
+// jumpToClosestLine finds the node closest to the given line number and selects it
+func (m *Model) jumpToClosestLine(line int) bool {
+	if m.Document.Index.Len() == 0 {
+		return false
+	}
+
+	// Find the node with line number closest to target
+	var closestNode *model.Node
+	minDistance := -1
+
+	for i := 0; i < m.Document.Index.Len(); i++ {
+		entry := m.Document.Index.EntryAt(i)
+		if entry.Node == nil || entry.Node.LineNumber <= 0 {
+			continue
+		}
+
+		distance := abs(entry.Node.LineNumber - line)
+		if minDistance == -1 || distance < minDistance {
+			minDistance = distance
+			closestNode = entry.Node
+		}
+	}
+
+	if closestNode == nil {
+		return false
+	}
+
+	// Use the existing jumpToNode to expand and select
+	return m.jumpToNode(closestNode)
+}
+
+// abs returns the absolute value of an integer
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}

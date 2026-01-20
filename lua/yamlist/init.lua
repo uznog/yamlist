@@ -42,24 +42,52 @@ local function write_buffer_to_temp(bufnr)
   return tmpfile
 end
 
--- Start a Unix socket server for cursor sync
-local function start_socket_server(edit_win)
+-- Throttle timer for cursor updates
+local cursor_timer = nil
+local cursor_throttle_ms = 150
+
+-- Send cursor position to yamlist
+local function send_cursor_position(client_pipe, line)
+  if client_pipe then
+    local msg = { op = "cursor", line = line }
+    local json_msg = vim.json.encode(msg) .. "\n"
+    pcall(function()
+      client_pipe:write(json_msg)
+    end)
+  end
+end
+
+-- Throttled cursor position send
+local function schedule_cursor_send(client_pipe, line)
+  if cursor_timer then
+    vim.fn.timer_stop(cursor_timer)
+  end
+  cursor_timer = vim.fn.timer_start(cursor_throttle_ms, function()
+    send_cursor_position(client_pipe, line)
+    cursor_timer = nil
+  end)
+end
+
+-- Start a Unix socket server for bidirectional cursor sync
+local function start_socket_server(edit_win, edit_buf)
   local uv = vim.loop
   local socket_path = vim.fn.tempname() .. ".sock"
   local server = uv.new_pipe(false)
+  local client_pipe = nil
 
   server:bind(socket_path)
   server:listen(128, function(err)
     if err then
       return
     end
-    local client = uv.new_pipe(false)
-    server:accept(client)
+    client_pipe = uv.new_pipe(false)
+    server:accept(client_pipe)
 
     local buffer = ""
-    client:read_start(function(read_err, data)
+    client_pipe:read_start(function(read_err, data)
       if read_err or not data then
-        client:close()
+        client_pipe:close()
+        client_pipe = nil
         return
       end
       buffer = buffer .. data
@@ -93,12 +121,19 @@ local function start_socket_server(edit_win)
     end)
   end)
 
-  return server, socket_path
+  -- Return a function to send cursor messages
+  return server, socket_path, function(line)
+    schedule_cursor_send(client_pipe, line)
+  end
 end
 
 function M.open(file)
   local edit_win = vim.api.nvim_get_current_win()
   local edit_buf = vim.api.nvim_get_current_buf()
+
+  -- Get current cursor position before starting yamlist
+  local cursor = vim.api.nvim_win_get_cursor(edit_win)
+  local current_line = cursor[1]  -- 1-based line number
 
   -- Determine source file
   local source_file
@@ -125,8 +160,8 @@ function M.open(file)
     source_file = tmpfile
   end
 
-  -- Start socket server for cursor sync
-  local server, socket_path = start_socket_server(edit_win)
+  -- Start socket server for bidirectional cursor sync
+  local server, socket_path, send_cursor = start_socket_server(edit_win, edit_buf)
 
   -- Create floating terminal window
   local term_buf, term_win = create_float_win()
@@ -139,10 +174,28 @@ function M.open(file)
   table.insert(cmd, "--nvim-socket=" .. socket_path)
   table.insert(cmd, source_file)
 
+  -- Set up autocmd to track cursor movement in the edit window
+  local cursor_autocmd = vim.api.nvim_create_autocmd("CursorMoved", {
+    buffer = edit_buf,
+    callback = function()
+      if vim.api.nvim_win_is_valid(edit_win) then
+        local cur = vim.api.nvim_win_get_cursor(edit_win)
+        send_cursor(cur[1])
+      end
+    end,
+  })
+
   -- Run yamlist in terminal
   vim.fn.termopen(cmd, {
     on_exit = function()
       -- Cleanup
+      if cursor_timer then
+        vim.fn.timer_stop(cursor_timer)
+        cursor_timer = nil
+      end
+      if cursor_autocmd then
+        pcall(vim.api.nvim_del_autocmd, cursor_autocmd)
+      end
       if server then
         server:close()
       end
@@ -158,6 +211,11 @@ function M.open(file)
       end
     end,
   })
+
+  -- Send initial cursor position after a short delay to ensure yamlist is ready
+  vim.defer_fn(function()
+    send_cursor(current_line)
+  end, 100)
 
   -- Enter insert mode to interact with terminal
   vim.cmd("startinsert")
