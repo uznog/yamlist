@@ -2,6 +2,7 @@ package tui
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/uznog/yamlist/internal/model"
 )
 
 // handleTreeKey handles key input in tree mode
@@ -15,17 +16,27 @@ func (m *Model) handleTreeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Expand/collapse
 	case "h", "left":
-		m.collapseSelected()
+		if m.ViewMode == TreeView {
+			m.collapseSelected()
+		}
 	case "l", "right":
-		m.expandSelected()
+		if m.ViewMode == TreeView {
+			m.expandSelected()
+		}
 	case "enter", " ":
-		m.toggleExpand()
+		if m.ViewMode == TreeView {
+			m.toggleExpand()
+		}
 
 	// Collapse/expand all
 	case "z":
-		m.collapseAll()
+		if m.ViewMode == TreeView {
+			m.collapseAll()
+		}
 	case "Z":
-		m.expandAll()
+		if m.ViewMode == TreeView {
+			m.expandAll()
+		}
 
 	// Page navigation
 	case "ctrl+d":
@@ -46,6 +57,10 @@ func (m *Model) handleTreeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Search
 	case "/":
 		return m.enterSearchMode()
+
+	// Toggle view mode (tree <-> flat)
+	case "tab":
+		return m.toggleViewMode()
 
 	// Clear search / Quit
 	case "esc":
@@ -115,8 +130,18 @@ func (m *Model) exitSearchMode(keep bool) (tea.Model, tea.Cmd) {
 		// Enter: keep highlighting, jump to current match
 		m.SearchActive = len(m.SearchMatches) > 0
 		if len(m.SearchMatches) > 0 {
-			match := m.SearchMatches[m.SearchIndex]
-			m.jumpToNode(match.Node)
+			if m.ViewMode == FlatView {
+				// In flat mode, re-apply filter to keep only matching rows
+				m.filterVisibleRowsToMatches()
+				// Select the current match in the filtered view
+				match := m.SearchMatches[m.SearchIndex]
+				m.TreeState.SelectNode(match.Node)
+				m.ensureSelectedVisible()
+			} else {
+				// In tree mode, jump to node (which expands ancestors)
+				match := m.SearchMatches[m.SearchIndex]
+				m.jumpToNode(match.Node)
+			}
 		}
 		// Re-apply dimming after jumpToNode (which may recreate rows)
 		m.updateRowDimming()
@@ -135,4 +160,38 @@ func (m *Model) clearSearch() {
 	m.SearchIndex = 0
 	m.SearchActive = false
 	m.updateRowDimming()
+}
+
+// toggleViewMode switches between tree and flat view
+func (m *Model) toggleViewMode() (tea.Model, tea.Cmd) {
+	// Save current selection path
+	var selectedPath *model.Path
+	if row := m.TreeState.GetSelectedRow(); row != nil {
+		selectedPath = row.Node.Path
+	}
+
+	// Toggle view mode
+	if m.ViewMode == TreeView {
+		m.ViewMode = FlatView
+	} else {
+		m.ViewMode = TreeView
+	}
+
+	// Recompute rows for new view
+	m.computeVisibleRows()
+
+	// Restore selection by path
+	if selectedPath != nil {
+		if !m.TreeState.SelectByPath(selectedPath) {
+			// Fallback to first row if selection lost
+			m.TreeState.SelectedIndex = 0
+			if len(m.TreeState.VisibleRows) > 0 {
+				m.TreeState.SelectedNode = m.TreeState.VisibleRows[0].Node
+			}
+		}
+	}
+
+	m.ensureSelectedVisible()
+	m.notifyLineChange()
+	return m, nil
 }

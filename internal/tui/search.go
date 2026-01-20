@@ -12,6 +12,8 @@ func (m *Model) updateSearchMatches() {
 	if query == "" {
 		m.SearchMatches = nil
 		m.SearchIndex = 0
+		m.SearchActive = false
+		m.computeVisibleRows() // Reset to full view
 		m.updateRowDimming()
 		return
 	}
@@ -28,13 +30,18 @@ func (m *Model) updateSearchMatches() {
 		}
 	}
 
+	m.SearchActive = true
+
 	// Reset index if out of bounds
 	if m.SearchIndex >= len(m.SearchMatches) {
 		m.SearchIndex = 0
 	}
 
+	// Filter visible rows to show only matches
+	m.filterVisibleRowsToMatches()
+
 	// Jump to first match if available
-	if len(m.SearchMatches) > 0 {
+	if len(m.SearchMatches) > 0 && m.TreeState.SelectedIndex >= len(m.TreeState.VisibleRows) {
 		m.previewMatch(m.SearchIndex)
 	}
 
@@ -44,7 +51,31 @@ func (m *Model) updateSearchMatches() {
 
 // updateRowDimming updates the IsDimmed and IsSearchMatch flags on all visible rows
 func (m *Model) updateRowDimming() {
-	// Build a set of matching node paths for quick lookup
+	// If search is active but no matches, dim all rows
+	if m.SearchActive && len(m.SearchMatches) == 0 && m.SearchInput.Value() != "" {
+		for _, row := range m.TreeState.VisibleRows {
+			row.IsDimmed = true
+			row.IsSearchMatch = false
+		}
+		return
+	}
+
+	// Otherwise, no dimming (rows are filtered, not dimmed)
+	for _, row := range m.TreeState.VisibleRows {
+		row.IsDimmed = false
+		row.IsSearchMatch = false
+	}
+}
+
+// filterVisibleRowsToMatches filters the visible rows to show only matches (and their ancestors in tree mode)
+func (m *Model) filterVisibleRowsToMatches() {
+	if len(m.SearchMatches) == 0 {
+		// No matches - keep all rows but dim them
+		m.updateRowDimming()
+		return
+	}
+
+	// Build set of matching paths
 	matchPaths := make(map[string]bool)
 	for _, match := range m.SearchMatches {
 		if match.Node != nil && match.Node.Path != nil {
@@ -52,21 +83,57 @@ func (m *Model) updateRowDimming() {
 		}
 	}
 
-	// Update each visible row
-	for _, row := range m.TreeState.VisibleRows {
-		if m.SearchActive && len(m.SearchMatches) > 0 {
-			// Search is active with matches - dim non-matching rows
-			pathStr := ""
-			if row.Node.Path != nil {
-				pathStr = row.Node.Path.String()
+	// First, recompute the full visible rows list
+	if m.ViewMode == FlatView {
+		m.computeFlatRows()
+	} else {
+		m.TreeState.VisibleRows = make([]*model.VisibleRow, 0)
+		m.computeVisibleRowsRecursive(m.Document.Root, 0)
+	}
+
+	// Filter VisibleRows
+	if m.ViewMode == FlatView {
+		// In flat mode: show only matching nodes
+		filtered := make([]*model.VisibleRow, 0)
+		for _, row := range m.TreeState.VisibleRows {
+			if matchPaths[row.Node.Path.String()] {
+				filtered = append(filtered, row)
 			}
-			row.IsSearchMatch = matchPaths[pathStr]
-			row.IsDimmed = !row.IsSearchMatch
-		} else {
-			// No active search - no dimming
-			row.IsSearchMatch = false
-			row.IsDimmed = false
 		}
+		m.TreeState.VisibleRows = filtered
+	} else {
+		// In tree mode: show matches + their ancestors (for context)
+		filtered := make([]*model.VisibleRow, 0)
+		for _, row := range m.TreeState.VisibleRows {
+			if matchPaths[row.Node.Path.String()] {
+				filtered = append(filtered, row)
+			} else {
+				// Check if this row is an ancestor of any match
+				for _, match := range m.SearchMatches {
+					if match.Node != nil && row.Node.Path.IsAncestorOf(match.Node.Path) {
+						filtered = append(filtered, row)
+						break
+					}
+				}
+			}
+		}
+		m.TreeState.VisibleRows = filtered
+	}
+
+	// Recalculate indices
+	for i, row := range m.TreeState.VisibleRows {
+		row.Index = i
+	}
+
+	// Ensure selection is valid
+	if m.TreeState.SelectedIndex >= len(m.TreeState.VisibleRows) {
+		m.TreeState.SelectedIndex = len(m.TreeState.VisibleRows) - 1
+	}
+	if m.TreeState.SelectedIndex < 0 {
+		m.TreeState.SelectedIndex = 0
+	}
+	if len(m.TreeState.VisibleRows) > 0 && m.TreeState.SelectedIndex < len(m.TreeState.VisibleRows) {
+		m.TreeState.SelectedNode = m.TreeState.VisibleRows[m.TreeState.SelectedIndex].Node
 	}
 }
 
@@ -101,12 +168,17 @@ func (m *Model) previewMatch(index int) {
 
 	match := m.SearchMatches[index]
 
-	// Expand ancestors and select the node for preview
-	// but don't change the actual tree selection yet
-	m.TreeState.ExpandToNode(match.Node)
-	m.computeVisibleRows()
-	m.TreeState.SelectNode(match.Node)
-	m.centerSelected()
+	if m.ViewMode == FlatView {
+		// In flat mode, just select the node in the filtered view
+		m.TreeState.SelectNode(match.Node)
+		m.centerSelected()
+	} else {
+		// In tree mode, expand ancestors and select the node for preview
+		m.TreeState.ExpandToNode(match.Node)
+		m.computeVisibleRows()
+		m.TreeState.SelectNode(match.Node)
+		m.centerSelected()
+	}
 
 	// Re-apply dimming after computeVisibleRows recreated rows
 	m.updateRowDimming()

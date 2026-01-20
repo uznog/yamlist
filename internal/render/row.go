@@ -25,61 +25,81 @@ func NewRowRenderer(icons *IconSet, styles *Styles) *RowRenderer {
 }
 
 // FormatRow formats a visible row for display
-func (r *RowRenderer) FormatRow(row *model.VisibleRow, width int) string {
+func (r *RowRenderer) FormatRow(row *model.VisibleRow, width int, isFlatMode bool) string {
 	var b strings.Builder
 
 	// Determine if row should be dimmed (non-match during active search)
 	isDimmed := row.IsDimmed
 
-	// Indentation
-	indent := strings.Repeat(" ", row.Depth*r.Indent)
-	b.WriteString(indent)
-
-	// Expand/collapse icon
-	expandIcon := r.Icons.GetExpandIcon(row.IsExpanded, row.IsExpandable)
-	if row.IsSelected {
-		b.WriteString(expandIcon)
-	} else if isDimmed {
-		b.WriteString(r.Styles.DimmedRow.Render(expandIcon))
-	} else {
-		b.WriteString(r.Styles.ExpandIcon.Render(expandIcon))
-	}
-	b.WriteString(" ")
-
-	// Type icon
-	typeIcon := r.Icons.GetTypeIcon(row.Kind(), row.ScalarType())
-	if row.IsSelected {
-		b.WriteString(typeIcon)
-	} else if isDimmed {
-		b.WriteString(r.Styles.DimmedRow.Render(typeIcon))
-	} else {
-		b.WriteString(r.Styles.TypeIcon.Render(typeIcon))
-	}
-	b.WriteString(" ")
-
-	// Key
-	key := row.DisplayKey()
-	if row.IsSelected {
-		b.WriteString(r.Styles.SelectedKey.Render(key))
-	} else if isDimmed {
-		b.WriteString(r.Styles.DimmedKey.Render(key))
-	} else {
-		b.WriteString(r.Styles.Key.Render(key))
-	}
-
-	// Value or child count
-	if row.Kind() == model.KindScalar {
-		b.WriteString(": ")
-		value := r.formatScalarValue(row.ScalarValue(), row.ScalarType(), row.IsSelected, isDimmed)
-		b.WriteString(value)
-	} else if row.HasChildren {
-		countStr := fmt.Sprintf(" (%d)", row.ChildCount)
+	if isFlatMode {
+		// In flat mode, show full path instead of indentation
+		pathStr := row.PathString()
 		if row.IsSelected {
-			b.WriteString(countStr)
+			b.WriteString(r.Styles.SelectedKey.Render(pathStr))
 		} else if isDimmed {
-			b.WriteString(r.Styles.DimmedRow.Render(countStr))
+			b.WriteString(r.Styles.DimmedKey.Render(pathStr))
 		} else {
-			b.WriteString(r.Styles.ChildCount.Render(countStr))
+			b.WriteString(r.Styles.Key.Render(pathStr))
+		}
+
+		// Add value for scalars
+		if row.Kind() == model.KindScalar {
+			b.WriteString(": ")
+			value := r.formatScalarValue(row.ScalarValue(), row.ScalarType(), row.IsSelected, isDimmed)
+			b.WriteString(value)
+		}
+	} else {
+		// Tree mode rendering (existing behavior)
+		// Indentation
+		indent := strings.Repeat(" ", row.Depth*r.Indent)
+		b.WriteString(indent)
+
+		// Expand/collapse icon
+		expandIcon := r.Icons.GetExpandIcon(row.IsExpanded, row.IsExpandable)
+		if row.IsSelected {
+			b.WriteString(expandIcon)
+		} else if isDimmed {
+			b.WriteString(r.Styles.DimmedRow.Render(expandIcon))
+		} else {
+			b.WriteString(r.Styles.ExpandIcon.Render(expandIcon))
+		}
+		b.WriteString(" ")
+
+		// Type icon
+		typeIcon := r.Icons.GetTypeIcon(row.Kind(), row.ScalarType())
+		if row.IsSelected {
+			b.WriteString(typeIcon)
+		} else if isDimmed {
+			b.WriteString(r.Styles.DimmedRow.Render(typeIcon))
+		} else {
+			b.WriteString(r.Styles.TypeIcon.Render(typeIcon))
+		}
+		b.WriteString(" ")
+
+		// Key
+		key := row.DisplayKey()
+		if row.IsSelected {
+			b.WriteString(r.Styles.SelectedKey.Render(key))
+		} else if isDimmed {
+			b.WriteString(r.Styles.DimmedKey.Render(key))
+		} else {
+			b.WriteString(r.Styles.Key.Render(key))
+		}
+
+		// Value or child count
+		if row.Kind() == model.KindScalar {
+			b.WriteString(": ")
+			value := r.formatScalarValue(row.ScalarValue(), row.ScalarType(), row.IsSelected, isDimmed)
+			b.WriteString(value)
+		} else if row.HasChildren {
+			countStr := fmt.Sprintf(" (%d)", row.ChildCount)
+			if row.IsSelected {
+				b.WriteString(countStr)
+			} else if isDimmed {
+				b.WriteString(r.Styles.DimmedRow.Render(countStr))
+			} else {
+				b.WriteString(r.Styles.ChildCount.Render(countStr))
+			}
 		}
 	}
 
@@ -87,22 +107,32 @@ func (r *RowRenderer) FormatRow(row *model.VisibleRow, width int) string {
 
 	// Apply row-level styling
 	if row.IsSelected {
-		// Add accent marker at start (replace first char with accent)
-		accent := r.Styles.SelectionAccent.Render("▌")
-		if len(content) > 0 {
-			// Replace first character (usually a space) with accent marker
-			runes := []rune(content)
-			content = accent + string(runes[1:])
+		if isFlatMode {
+			// In flat mode, don't replace first char - just highlight the full row
+			// Pad to full width for selection highlight
+			contentWidth := lipglossWidth(content)
+			if contentWidth < width {
+				content = content + strings.Repeat(" ", width-contentWidth)
+			}
+			return r.Styles.SelectedRow.Render(content)
 		} else {
-			content = accent
-		}
+			// In tree mode, add accent marker at start (replace first char with accent)
+			accent := r.Styles.SelectionAccent.Render("▌")
+			if len(content) > 0 {
+				// Replace first character (usually a space) with accent marker
+				runes := []rune(content)
+				content = accent + string(runes[1:])
+			} else {
+				content = accent
+			}
 
-		// Pad to full width for selection highlight
-		contentWidth := lipglossWidth(content)
-		if contentWidth < width {
-			content = content + strings.Repeat(" ", width-contentWidth)
+			// Pad to full width for selection highlight
+			contentWidth := lipglossWidth(content)
+			if contentWidth < width {
+				content = content + strings.Repeat(" ", width-contentWidth)
+			}
+			return r.Styles.SelectedRow.Render(content)
 		}
-		return r.Styles.SelectedRow.Render(content)
 	}
 
 	return content

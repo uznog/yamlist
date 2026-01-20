@@ -17,18 +17,48 @@ func (m *Model) notifyLineChange() {
 
 // computeVisibleRows rebuilds the visible rows list based on current expansion state
 func (m *Model) computeVisibleRows() {
-	m.TreeState.VisibleRows = make([]*model.VisibleRow, 0)
-	m.computeVisibleRowsRecursive(m.Document.Root, 0)
+	if m.ViewMode == FlatView {
+		m.computeFlatRows()
+	} else {
+		m.TreeState.VisibleRows = make([]*model.VisibleRow, 0)
+		m.computeVisibleRowsRecursive(m.Document.Root, 0)
 
-	// Ensure selection is valid
+		// Ensure selection is valid
+		if m.TreeState.SelectedIndex >= len(m.TreeState.VisibleRows) {
+			m.TreeState.SelectedIndex = len(m.TreeState.VisibleRows) - 1
+		}
+		if m.TreeState.SelectedIndex < 0 {
+			m.TreeState.SelectedIndex = 0
+		}
+
+		// Update selected node reference
+		if len(m.TreeState.VisibleRows) > 0 {
+			m.TreeState.SelectedNode = m.TreeState.VisibleRows[m.TreeState.SelectedIndex].Node
+		}
+	}
+}
+
+// computeFlatRows computes all rows in flat mode (full path display)
+func (m *Model) computeFlatRows() {
+	m.TreeState.VisibleRows = make([]*model.VisibleRow, 0)
+
+	for i := 0; i < m.Document.Index.Len(); i++ {
+		entry := m.Document.Index.EntryAt(i)
+		// Skip root node (no meaningful path)
+		if entry.Node != nil && entry.Node.Path != nil && entry.Node.Path.Depth() > 0 {
+			row := model.NewVisibleRow(entry.Node, false, len(m.TreeState.VisibleRows))
+			row.Depth = 0 // No indentation in flat mode
+			m.TreeState.VisibleRows = append(m.TreeState.VisibleRows, row)
+		}
+	}
+
+	// Ensure selection is valid (same logic as existing computeVisibleRows)
 	if m.TreeState.SelectedIndex >= len(m.TreeState.VisibleRows) {
 		m.TreeState.SelectedIndex = len(m.TreeState.VisibleRows) - 1
 	}
 	if m.TreeState.SelectedIndex < 0 {
 		m.TreeState.SelectedIndex = 0
 	}
-
-	// Update selected node reference
 	if len(m.TreeState.VisibleRows) > 0 {
 		m.TreeState.SelectedNode = m.TreeState.VisibleRows[m.TreeState.SelectedIndex].Node
 	}

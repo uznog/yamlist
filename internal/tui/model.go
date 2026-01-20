@@ -17,6 +17,14 @@ const (
 	SearchMode
 )
 
+// ViewMode represents the current view mode (tree or flat)
+type ViewMode int
+
+const (
+	TreeView ViewMode = iota
+	FlatView
+)
+
 // Config holds configuration options
 type Config struct {
 	UseIcons        bool
@@ -43,6 +51,9 @@ type Model struct {
 
 	// Mode is the current UI mode
 	Mode Mode
+
+	// ViewMode is the current view mode (tree or flat)
+	ViewMode ViewMode
 
 	// Search state
 	SearchInput   textinput.Model
@@ -103,6 +114,7 @@ func NewModel(doc *yamlparse.Document, config *Config, nvimClient *nvim.Client) 
 		Document:        doc,
 		TreeState:       treeState,
 		Mode:            TreeMode,
+		ViewMode:        TreeView,
 		SearchInput:     ti,
 		SearchMatches:   make([]*model.PathEntry, 0),
 		SearchIndex:     0,

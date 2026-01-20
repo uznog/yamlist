@@ -66,7 +66,7 @@ func (m *Model) renderTreePane(height int) string {
 	for i := visibleStart; i < visibleEnd; i++ {
 		row := m.TreeState.VisibleRows[i]
 		row.IsSelected = (i == m.TreeState.SelectedIndex)
-		line := m.RowRenderer.FormatRow(row, m.TreeWidth)
+		line := m.RowRenderer.FormatRow(row, m.TreeWidth, m.ViewMode == FlatView)
 		lines = append(lines, truncateOrPad(line, m.TreeWidth))
 	}
 
@@ -118,15 +118,20 @@ func (m *Model) renderSeparator(height int) string {
 
 // renderStatusBar renders the bottom status bar
 func (m *Model) renderStatusBar() string {
-	// Mode indicator
-	modeStr := "TREE"
+	// Mode indicator - show TREE or FLAT based on view mode
+	var modeStr string
 	if m.Mode == SearchMode {
 		modeStr = "SEARCH"
+	} else if m.ViewMode == FlatView {
+		modeStr = "FLAT"
+	} else {
+		modeStr = "TREE"
 	}
+
 	mode := m.Styles.StatusMode.Render(modeStr)
 
-	// Help hint
-	help := m.Styles.StatusInfo.Render("j/k:nav h/l:fold n/N:match /:search q:quit")
+	// Help hint - updated to include Tab
+	help := m.Styles.StatusInfo.Render("j/k:nav tab:view h/l:fold n/N:match /:search q:quit")
 
 	// Path section - show full path of selected node
 	var pathStr string
