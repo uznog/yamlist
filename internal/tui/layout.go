@@ -7,15 +7,6 @@ import (
 )
 
 const (
-	// TreeWidthPercent is the percentage of width for the tree pane
-	TreeWidthPercent = 60
-
-	// MinTreeWidth is the minimum tree pane width
-	MinTreeWidth = 30
-
-	// MinPreviewWidth is the minimum preview pane width
-	MinPreviewWidth = 20
-
 	// StatusBarHeight is the height of the status bar
 	StatusBarHeight = 1
 
@@ -25,48 +16,31 @@ const (
 
 // updateLayout recalculates pane dimensions
 func (m *Model) updateLayout() {
-	// Calculate tree and preview widths
-	m.TreeWidth = (m.Width * TreeWidthPercent) / 100
-	if m.TreeWidth < MinTreeWidth {
-		m.TreeWidth = MinTreeWidth
-	}
-
-	m.PreviewWidth = m.Width - m.TreeWidth - 3 // 3 for separator
-	if m.PreviewWidth < MinPreviewWidth {
-		m.PreviewWidth = MinPreviewWidth
-		m.TreeWidth = m.Width - m.PreviewWidth - 3
-	}
+	// Full-width tree (no preview pane)
+	m.TreeWidth = m.Width
+	m.PreviewWidth = 0
 }
 
 // renderLayout renders the complete layout
 func (m *Model) renderLayout() string {
 	// Calculate content height
 	contentHeight := m.Height - StatusBarHeight
-	if m.Mode == SearchMode {
+	// Show search bar when in search mode OR when search is active (confirmed with Enter)
+	showSearchBar := m.Mode == SearchMode || m.SearchActive
+	if showSearchBar {
 		contentHeight -= SearchBarHeight
 	}
 
-	// Render tree pane
-	treeContent := m.renderTreePane(contentHeight)
-
-	// Render preview pane
-	previewContent := m.renderPreviewPane(contentHeight)
-
-	// Combine panes side by side
-	mainContent := lipgloss.JoinHorizontal(
-		lipgloss.Top,
-		treeContent,
-		m.renderSeparator(contentHeight),
-		previewContent,
-	)
+	// Render tree pane (full width, no preview)
+	mainContent := m.renderTreePane(contentHeight)
 
 	// Build final layout
 	var b strings.Builder
 	b.WriteString(mainContent)
 	b.WriteString("\n")
 
-	// Search bar (if in search mode)
-	if m.Mode == SearchMode {
+	// Search bar (if in search mode or search is active)
+	if showSearchBar {
 		b.WriteString(m.renderSearchBar())
 		b.WriteString("\n")
 	}
@@ -151,51 +125,58 @@ func (m *Model) renderStatusBar() string {
 	}
 	mode := m.Styles.StatusMode.Render(modeStr)
 
-	// Info section
-	var info string
+	// Help hint
+	help := m.Styles.StatusInfo.Render("j/k:nav h/l:fold n/N:match /:search q:quit")
+
+	// Path section - show full path of selected node
+	var pathStr string
 	if m.Error != "" {
-		info = m.Styles.MatchHighlight.Render(m.Error)
+		pathStr = m.Styles.MatchHighlight.Render(m.Error)
 	} else {
-		// Show current position
-		total := len(m.TreeState.VisibleRows)
-		current := m.TreeState.SelectedIndex + 1
-		if total > 0 {
-			info = m.Styles.StatusInfo.Render(
-				strings.Join([]string{
-					string(rune('0' + current%10)),
-					"/",
-					string(rune('0' + total%10)),
-				}, ""),
-			)
-			// Proper formatting
-			info = m.Styles.StatusInfo.Render(
-				formatPosition(current, total),
-			)
+		row := m.TreeState.GetSelectedRow()
+		if row != nil {
+			pathStr = row.PathString()
 		}
 	}
 
-	// Help hint
-	help := m.Styles.StatusInfo.Render("j/k:nav h/l:fold /:search q:quit")
+	// Calculate available width for path
+	modeWidth := lipgloss.Width(mode) + 1 // +1 for space after mode
+	helpWidth := lipgloss.Width(help)
+	availableWidth := m.Width - modeWidth - helpWidth - 4 // 4 for padding/spaces
+
+	// Truncate path with middle-ellipsis if needed
+	if availableWidth > 0 && len(pathStr) > availableWidth {
+		pathStr = truncatePathMiddle(pathStr, availableWidth)
+	}
+
+	pathRendered := m.Styles.StatusInfo.Render(pathStr)
 
 	// Combine
-	leftPart := mode + " " + info
-	rightPart := help
+	leftPart := mode + " " + pathRendered
 
 	// Calculate padding
-	padding := m.Width - lipgloss.Width(leftPart) - lipgloss.Width(rightPart)
+	padding := m.Width - lipgloss.Width(leftPart) - helpWidth
 	if padding < 0 {
 		padding = 0
 	}
 
 	return m.Styles.StatusBar.Render(
-		leftPart + strings.Repeat(" ", padding) + rightPart,
+		leftPart + strings.Repeat(" ", padding) + help,
 	)
 }
 
 // renderSearchBar renders the search input bar
 func (m *Model) renderSearchBar() string {
 	prompt := m.Styles.SearchPrompt.Render("/")
-	input := m.SearchInput.View()
+
+	// In tree mode with active search, show the term without cursor (non-editable display)
+	var input string
+	if m.Mode == SearchMode {
+		input = m.SearchInput.View()
+	} else {
+		// Just show the search term text (no cursor/editing)
+		input = m.Styles.SearchPrompt.Render(m.SearchInput.Value())
+	}
 
 	// Match count
 	matchInfo := ""
@@ -249,4 +230,71 @@ func intToString(n int) string {
 		n /= 10
 	}
 	return string(digits)
+}
+
+// truncatePathMiddle truncates a path string with middle-ellipsis
+// Keeps the first segment and last 2 meaningful segments
+// Example: "metadata.spec.containers[0].env[2].name" → "metadata...env[2].name"
+func truncatePathMiddle(path string, maxWidth int) string {
+	if len(path) <= maxWidth {
+		return path
+	}
+
+	// Need at least space for "..."
+	if maxWidth < 4 {
+		return path[:maxWidth]
+	}
+
+	// Split path into segments (by . and [)
+	segments := splitPathSegments(path)
+	if len(segments) <= 3 {
+		// Too few segments - just truncate from end
+		return path[:maxWidth-3] + "..."
+	}
+
+	// Keep first segment + "..." + last 2 segments
+	first := segments[0]
+	last2 := strings.Join(segments[len(segments)-2:], "")
+
+	result := first + "..." + last2
+	if len(result) <= maxWidth {
+		return result
+	}
+
+	// Still too long - truncate the end portion
+	availableEnd := maxWidth - len(first) - 3 // 3 for "..."
+	if availableEnd < 1 {
+		return path[:maxWidth-3] + "..."
+	}
+
+	return first + "..." + last2[len(last2)-availableEnd:]
+}
+
+// splitPathSegments splits a path into segments, keeping delimiters attached
+// e.g., "a.b[0].c" → ["a", ".b", "[0]", ".c"]
+func splitPathSegments(path string) []string {
+	var segments []string
+	var current strings.Builder
+
+	for i, r := range path {
+		if r == '.' || r == '[' {
+			if current.Len() > 0 {
+				segments = append(segments, current.String())
+				current.Reset()
+			}
+			if r == '.' && i > 0 {
+				current.WriteRune(r)
+			} else if r == '[' {
+				current.WriteRune(r)
+			}
+		} else {
+			current.WriteRune(r)
+		}
+	}
+
+	if current.Len() > 0 {
+		segments = append(segments, current.String())
+	}
+
+	return segments
 }

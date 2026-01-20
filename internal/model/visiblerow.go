@@ -26,6 +26,12 @@ type VisibleRow struct {
 
 	// Index is the row index in the visible rows list
 	Index int
+
+	// IsSearchMatch indicates if this row matches the current search query
+	IsSearchMatch bool
+
+	// IsDimmed indicates if this row should be displayed dimmed (non-match during active search)
+	IsDimmed bool
 }
 
 // NewVisibleRow creates a visible row from a node

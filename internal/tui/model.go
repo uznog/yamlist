@@ -4,6 +4,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/uznog/yamlist/internal/model"
+	"github.com/uznog/yamlist/internal/nvim"
 	"github.com/uznog/yamlist/internal/render"
 	"github.com/uznog/yamlist/internal/yamlparse"
 )
@@ -47,6 +48,7 @@ type Model struct {
 	SearchInput   textinput.Model
 	SearchMatches []*model.PathEntry
 	SearchIndex   int
+	SearchActive  bool // True when search results should be highlighted/dimmed
 
 	// Rendering
 	RowRenderer     *render.RowRenderer
@@ -65,10 +67,13 @@ type Model struct {
 
 	// Error message (if any)
 	Error string
+
+	// NvimClient for cursor sync with Neovim (nil if standalone)
+	NvimClient *nvim.Client
 }
 
 // NewModel creates a new TUI model
-func NewModel(doc *yamlparse.Document, config *Config) *Model {
+func NewModel(doc *yamlparse.Document, config *Config, nvimClient *nvim.Client) *Model {
 	if config == nil {
 		config = DefaultConfig()
 	}
@@ -91,6 +96,9 @@ func NewModel(doc *yamlparse.Document, config *Config) *Model {
 	// Create tree state
 	treeState := model.NewTreeState(doc.Root)
 
+	// Expand all nodes by default
+	treeState.ExpandAll()
+
 	m := &Model{
 		Document:        doc,
 		TreeState:       treeState,
@@ -103,6 +111,7 @@ func NewModel(doc *yamlparse.Document, config *Config) *Model {
 		Icons:           icons,
 		Styles:          styles,
 		Config:          config,
+		NvimClient:      nvimClient,
 	}
 
 	// Initialize visible rows

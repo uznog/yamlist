@@ -37,11 +37,19 @@ func (m *Model) handleTreeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "G":
 		m.goToBottom()
 
+	// Search match navigation (works even outside search mode)
+	case "n":
+		m.nextMatch()
+	case "N":
+		m.prevMatch()
+
 	// Search
 	case "/":
 		return m.enterSearchMode()
 
-	// Quit
+	// Clear search / Quit
+	case "esc":
+		m.clearSearch()
 	case "q", "ctrl+c":
 		return m, tea.Quit
 	}
@@ -53,9 +61,11 @@ func (m *Model) handleTreeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
+		// Esc clears search completely
 		return m.exitSearchMode(false)
 
 	case "enter":
+		// Enter confirms search, keeps highlighting
 		return m.exitSearchMode(true)
 
 	case "ctrl+n", "down":
@@ -81,24 +91,48 @@ func (m *Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // enterSearchMode switches to search mode
 func (m *Model) enterSearchMode() (tea.Model, tea.Cmd) {
 	m.Mode = SearchMode
-	m.SearchInput.Reset()
+	// If there's an existing search, keep it and allow editing
+	// Only reset if starting fresh (no active search)
+	if !m.SearchActive {
+		m.SearchInput.Reset()
+		m.SearchMatches = nil
+		m.SearchIndex = 0
+	}
 	m.SearchInput.Focus()
-	m.SearchMatches = nil
-	m.SearchIndex = 0
+	m.SearchActive = true
+	m.updateRowDimming()
 	return m, nil
 }
 
 // exitSearchMode exits search mode
-// If jump is true, jump to the selected match
-func (m *Model) exitSearchMode(jump bool) (tea.Model, tea.Cmd) {
+// If keep is true, keep the search results highlighted (Enter)
+// If keep is false, clear search completely (Esc)
+func (m *Model) exitSearchMode(keep bool) (tea.Model, tea.Cmd) {
 	m.Mode = TreeMode
 	m.SearchInput.Blur()
 
-	if jump && len(m.SearchMatches) > 0 {
-		// Jump to selected match
-		match := m.SearchMatches[m.SearchIndex]
-		m.jumpToNode(match.Node)
+	if keep {
+		// Enter: keep highlighting, jump to current match
+		m.SearchActive = len(m.SearchMatches) > 0
+		if len(m.SearchMatches) > 0 {
+			match := m.SearchMatches[m.SearchIndex]
+			m.jumpToNode(match.Node)
+		}
+		// Re-apply dimming after jumpToNode (which may recreate rows)
+		m.updateRowDimming()
+	} else {
+		// Esc: clear search completely
+		m.clearSearch()
 	}
 
 	return m, nil
+}
+
+// clearSearch clears the search state and removes all highlighting
+func (m *Model) clearSearch() {
+	m.SearchInput.Reset()
+	m.SearchMatches = nil
+	m.SearchIndex = 0
+	m.SearchActive = false
+	m.updateRowDimming()
 }

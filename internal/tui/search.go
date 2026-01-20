@@ -1,22 +1,10 @@
 package tui
 
 import (
+	"strings"
+
 	"github.com/uznog/yamlist/internal/model"
-	"github.com/sahilm/fuzzy"
 )
-
-// searchSource wraps PathIndex to implement fuzzy.Source
-type searchSource struct {
-	index *model.PathIndex
-}
-
-func (s searchSource) String(i int) string {
-	return s.index.EntryAt(i).DisplayString
-}
-
-func (s searchSource) Len() int {
-	return s.index.Len()
-}
 
 // updateSearchMatches updates the search matches based on current input
 func (m *Model) updateSearchMatches() {
@@ -24,17 +12,20 @@ func (m *Model) updateSearchMatches() {
 	if query == "" {
 		m.SearchMatches = nil
 		m.SearchIndex = 0
+		m.updateRowDimming()
 		return
 	}
 
-	// Perform fuzzy search
-	source := searchSource{index: m.Document.Index}
-	results := fuzzy.FindFrom(query, source)
+	// Use case-insensitive substring search on node key name only
+	queryLower := strings.ToLower(query)
+	m.SearchMatches = make([]*model.PathEntry, 0)
 
-	// Convert results to PathEntries
-	m.SearchMatches = make([]*model.PathEntry, len(results))
-	for i, result := range results {
-		m.SearchMatches[i] = m.Document.Index.EntryAt(result.Index)
+	for i := 0; i < m.Document.Index.Len(); i++ {
+		entry := m.Document.Index.EntryAt(i)
+		// Search only on the key name, not the full path
+		if entry.Node != nil && strings.Contains(strings.ToLower(entry.Node.Key), queryLower) {
+			m.SearchMatches = append(m.SearchMatches, entry)
+		}
 	}
 
 	// Reset index if out of bounds
@@ -45,6 +36,37 @@ func (m *Model) updateSearchMatches() {
 	// Jump to first match if available
 	if len(m.SearchMatches) > 0 {
 		m.previewMatch(m.SearchIndex)
+	}
+
+	// Update row dimming AFTER previewMatch (which may call computeVisibleRows)
+	m.updateRowDimming()
+}
+
+// updateRowDimming updates the IsDimmed and IsSearchMatch flags on all visible rows
+func (m *Model) updateRowDimming() {
+	// Build a set of matching node paths for quick lookup
+	matchPaths := make(map[string]bool)
+	for _, match := range m.SearchMatches {
+		if match.Node != nil && match.Node.Path != nil {
+			matchPaths[match.Node.Path.String()] = true
+		}
+	}
+
+	// Update each visible row
+	for _, row := range m.TreeState.VisibleRows {
+		if m.SearchActive && len(m.SearchMatches) > 0 {
+			// Search is active with matches - dim non-matching rows
+			pathStr := ""
+			if row.Node.Path != nil {
+				pathStr = row.Node.Path.String()
+			}
+			row.IsSearchMatch = matchPaths[pathStr]
+			row.IsDimmed = !row.IsSearchMatch
+		} else {
+			// No active search - no dimming
+			row.IsSearchMatch = false
+			row.IsDimmed = false
+		}
 	}
 }
 
@@ -84,7 +106,10 @@ func (m *Model) previewMatch(index int) {
 	m.TreeState.ExpandToNode(match.Node)
 	m.computeVisibleRows()
 	m.TreeState.SelectNode(match.Node)
-	m.ensureSelectedVisible()
+	m.centerSelected()
+
+	// Re-apply dimming after computeVisibleRows recreated rows
+	m.updateRowDimming()
 }
 
 // getCurrentMatch returns the currently selected match

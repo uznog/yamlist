@@ -17,10 +17,12 @@ type Styles struct {
 	SelectedRow     lipgloss.Style
 	NormalRow       lipgloss.Style
 	SelectionAccent lipgloss.Style
+	DimmedRow       lipgloss.Style // For non-matching rows during search
 
 	// Key styles
 	Key           lipgloss.Style
 	SelectedKey   lipgloss.Style
+	DimmedKey     lipgloss.Style // For non-matching rows during search
 
 	// Value styles by type
 	StringValue   lipgloss.Style
@@ -63,6 +65,8 @@ func DefaultStyles() *Styles {
 		SelectionAccent: lipgloss.NewStyle().
 			Background(lipgloss.Color("62")).
 			Foreground(lipgloss.Color("117")),
+		DimmedRow: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")), // Grey for non-matches
 
 		// Key styles
 		Key: lipgloss.NewStyle().
@@ -70,6 +74,8 @@ func DefaultStyles() *Styles {
 		SelectedKey: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("230")).
 			Bold(true),
+		DimmedKey: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")), // Grey for non-matches
 
 		// Value styles
 		StringValue: lipgloss.NewStyle().
@@ -171,6 +177,8 @@ func DarkStyles() *Styles {
 		SelectionAccent: lipgloss.NewStyle().
 			Background(lipgloss.Color("62")).
 			Foreground(lipgloss.Color("117")),
+		DimmedRow: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")), // Grey for non-matches
 
 		// Key styles
 		Key: lipgloss.NewStyle().
@@ -178,6 +186,8 @@ func DarkStyles() *Styles {
 		SelectedKey: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("230")).
 			Bold(true),
+		DimmedKey: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")), // Grey for non-matches
 
 		// Value styles
 		StringValue: lipgloss.NewStyle().
@@ -243,7 +253,8 @@ func MonoStyles() *Styles {
 	gray := lipgloss.Color("245")
 	white := lipgloss.Color("252")
 	bgHighlight := lipgloss.Color("238")
-	accentColor := lipgloss.Color("75") // Soft blue for selection accent
+	accentColor := lipgloss.Color("75")  // Soft blue for selection accent
+	dimmedColor := lipgloss.Color("240") // Dimmed for non-matches
 
 	return &Styles{
 		// Row styles
@@ -254,6 +265,8 @@ func MonoStyles() *Styles {
 		SelectionAccent: lipgloss.NewStyle().
 			Background(bgHighlight).
 			Foreground(accentColor),
+		DimmedRow: lipgloss.NewStyle().
+			Foreground(dimmedColor),
 
 		// Key styles
 		Key: lipgloss.NewStyle().
@@ -261,6 +274,8 @@ func MonoStyles() *Styles {
 		SelectedKey: lipgloss.NewStyle().
 			Foreground(white).
 			Bold(true),
+		DimmedKey: lipgloss.NewStyle().
+			Foreground(dimmedColor),
 
 		// Value styles - all same color for mono
 		StringValue: lipgloss.NewStyle().

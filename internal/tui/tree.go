@@ -4,6 +4,17 @@ import (
 	"github.com/uznog/yamlist/internal/model"
 )
 
+// notifyLineChange sends a cursor position update to Neovim if connected
+func (m *Model) notifyLineChange() {
+	if m.NvimClient == nil {
+		return
+	}
+	row := m.TreeState.GetSelectedRow()
+	if row != nil && row.Node.LineNumber > 0 {
+		m.NvimClient.SendCursor(row.Node.LineNumber)
+	}
+}
+
 // computeVisibleRows rebuilds the visible rows list based on current expansion state
 func (m *Model) computeVisibleRows() {
 	m.TreeState.VisibleRows = make([]*model.VisibleRow, 0)
@@ -47,12 +58,14 @@ func (m *Model) computeVisibleRowsRecursive(node *model.Node, depth int) {
 func (m *Model) moveUp(n int) {
 	m.TreeState.MoveSelection(-n)
 	m.ensureSelectedVisible()
+	m.notifyLineChange()
 }
 
 // moveDown moves selection down by n rows
 func (m *Model) moveDown(n int) {
 	m.TreeState.MoveSelection(n)
 	m.ensureSelectedVisible()
+	m.notifyLineChange()
 }
 
 // expandSelected expands the selected node
@@ -64,7 +77,11 @@ func (m *Model) expandSelected() bool {
 
 	if row.IsExpanded {
 		// Already expanded - move to first child
-		return m.moveToFirstChild()
+		moved := m.moveToFirstChild()
+		if moved {
+			m.notifyLineChange()
+		}
+		return moved
 	}
 
 	// Expand
@@ -88,7 +105,11 @@ func (m *Model) collapseSelected() bool {
 	}
 
 	// Move to parent
-	return m.moveToParent()
+	moved := m.moveToParent()
+	if moved {
+		m.notifyLineChange()
+	}
+	return moved
 }
 
 // moveToParent moves selection to the parent node
@@ -175,7 +196,7 @@ func (m *Model) ensureSelectedVisible() {
 
 	// Calculate visible height (approximate)
 	visibleHeight := m.Height - StatusBarHeight
-	if m.Mode == SearchMode {
+	if m.Mode == SearchMode || m.SearchActive {
 		visibleHeight -= SearchBarHeight
 	}
 	if visibleHeight < 1 {
@@ -188,6 +209,37 @@ func (m *Model) ensureSelectedVisible() {
 	}
 	if m.TreeState.SelectedIndex >= m.TreeState.ScrollOffset+visibleHeight {
 		m.TreeState.ScrollOffset = m.TreeState.SelectedIndex - visibleHeight + 1
+	}
+}
+
+// centerSelected centers the selected row in the viewport
+func (m *Model) centerSelected() {
+	if len(m.TreeState.VisibleRows) == 0 {
+		return
+	}
+
+	// Calculate visible height
+	visibleHeight := m.Height - StatusBarHeight
+	if m.Mode == SearchMode || m.SearchActive {
+		visibleHeight -= SearchBarHeight
+	}
+	if visibleHeight < 1 {
+		visibleHeight = 1
+	}
+
+	// Center the selection
+	m.TreeState.ScrollOffset = m.TreeState.SelectedIndex - visibleHeight/2
+	if m.TreeState.ScrollOffset < 0 {
+		m.TreeState.ScrollOffset = 0
+	}
+
+	// Don't scroll past the end
+	maxOffset := len(m.TreeState.VisibleRows) - visibleHeight
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if m.TreeState.ScrollOffset > maxOffset {
+		m.TreeState.ScrollOffset = maxOffset
 	}
 }
 
@@ -206,6 +258,7 @@ func (m *Model) jumpToNode(node *model.Node) bool {
 	// Select the node
 	if m.TreeState.SelectNode(node) {
 		m.ensureSelectedVisible()
+		m.notifyLineChange()
 		return true
 	}
 
@@ -243,6 +296,7 @@ func (m *Model) goToTop() {
 		m.TreeState.SelectedNode = m.TreeState.VisibleRows[0].Node
 	}
 	m.TreeState.ScrollOffset = 0
+	m.notifyLineChange()
 }
 
 // goToBottom moves to the last row
@@ -253,4 +307,5 @@ func (m *Model) goToBottom() {
 	m.TreeState.SelectedIndex = len(m.TreeState.VisibleRows) - 1
 	m.TreeState.SelectedNode = m.TreeState.VisibleRows[m.TreeState.SelectedIndex].Node
 	m.ensureSelectedVisible()
+	m.notifyLineChange()
 }

@@ -32,7 +32,7 @@ func TestFormatScalarValue_Multiline(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := r.formatScalarValue(tt.value, model.ScalarString, false)
+			result := r.formatScalarValue(tt.value, model.ScalarString, false, false)
 			// Strip ANSI codes for comparison
 			plain := stripANSI(result)
 			if !strings.Contains(plain, tt.expected) {
@@ -61,7 +61,7 @@ func TestFormatScalarValue_Truncation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := r.formatScalarValue(tt.value, model.ScalarString, false)
+			result := r.formatScalarValue(tt.value, model.ScalarString, false, false)
 			plain := stripANSI(result)
 			if !strings.Contains(plain, tt.contains) {
 				t.Errorf("expected %q to contain %q", plain, tt.contains)
@@ -87,7 +87,7 @@ func TestFormatScalarValue_Types(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := r.formatScalarValue(tt.value, tt.scalarType, false)
+			result := r.formatScalarValue(tt.value, tt.scalarType, false, false)
 			plain := stripANSI(result)
 			if !strings.Contains(plain, tt.expected) {
 				t.Errorf("expected %q to contain %q", plain, tt.expected)

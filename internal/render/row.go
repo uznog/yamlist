@@ -28,6 +28,9 @@ func NewRowRenderer(icons *IconSet, styles *Styles) *RowRenderer {
 func (r *RowRenderer) FormatRow(row *model.VisibleRow, width int) string {
 	var b strings.Builder
 
+	// Determine if row should be dimmed (non-match during active search)
+	isDimmed := row.IsDimmed
+
 	// Indentation
 	indent := strings.Repeat(" ", row.Depth*r.Indent)
 	b.WriteString(indent)
@@ -36,6 +39,8 @@ func (r *RowRenderer) FormatRow(row *model.VisibleRow, width int) string {
 	expandIcon := r.Icons.GetExpandIcon(row.IsExpanded, row.IsExpandable)
 	if row.IsSelected {
 		b.WriteString(expandIcon)
+	} else if isDimmed {
+		b.WriteString(r.Styles.DimmedRow.Render(expandIcon))
 	} else {
 		b.WriteString(r.Styles.ExpandIcon.Render(expandIcon))
 	}
@@ -45,6 +50,8 @@ func (r *RowRenderer) FormatRow(row *model.VisibleRow, width int) string {
 	typeIcon := r.Icons.GetTypeIcon(row.Kind(), row.ScalarType())
 	if row.IsSelected {
 		b.WriteString(typeIcon)
+	} else if isDimmed {
+		b.WriteString(r.Styles.DimmedRow.Render(typeIcon))
 	} else {
 		b.WriteString(r.Styles.TypeIcon.Render(typeIcon))
 	}
@@ -54,6 +61,8 @@ func (r *RowRenderer) FormatRow(row *model.VisibleRow, width int) string {
 	key := row.DisplayKey()
 	if row.IsSelected {
 		b.WriteString(r.Styles.SelectedKey.Render(key))
+	} else if isDimmed {
+		b.WriteString(r.Styles.DimmedKey.Render(key))
 	} else {
 		b.WriteString(r.Styles.Key.Render(key))
 	}
@@ -61,12 +70,14 @@ func (r *RowRenderer) FormatRow(row *model.VisibleRow, width int) string {
 	// Value or child count
 	if row.Kind() == model.KindScalar {
 		b.WriteString(": ")
-		value := r.formatScalarValue(row.ScalarValue(), row.ScalarType(), row.IsSelected)
+		value := r.formatScalarValue(row.ScalarValue(), row.ScalarType(), row.IsSelected, isDimmed)
 		b.WriteString(value)
 	} else if row.HasChildren {
 		countStr := fmt.Sprintf(" (%d)", row.ChildCount)
 		if row.IsSelected {
 			b.WriteString(countStr)
+		} else if isDimmed {
+			b.WriteString(r.Styles.DimmedRow.Render(countStr))
 		} else {
 			b.WriteString(r.Styles.ChildCount.Render(countStr))
 		}
@@ -98,7 +109,7 @@ func (r *RowRenderer) FormatRow(row *model.VisibleRow, width int) string {
 }
 
 // formatScalarValue formats a scalar value with appropriate styling
-func (r *RowRenderer) formatScalarValue(value string, scalarType model.ScalarType, isSelected bool) string {
+func (r *RowRenderer) formatScalarValue(value string, scalarType model.ScalarType, isSelected bool, isDimmed bool) string {
 	displayValue := value
 
 	// Handle null type first
@@ -129,6 +140,10 @@ func (r *RowRenderer) formatScalarValue(value string, scalarType model.ScalarTyp
 
 	if isSelected {
 		return displayValue
+	}
+
+	if isDimmed {
+		return r.Styles.DimmedRow.Render(displayValue)
 	}
 
 	style := r.Styles.GetValueStyle(int(scalarType))
