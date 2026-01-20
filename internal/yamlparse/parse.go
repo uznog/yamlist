@@ -81,6 +81,7 @@ func convertNode(yn *yaml.Node, key string, index int, depth int, parentPath *mo
 			keyNode := yn.Content[i]
 			valueNode := yn.Content[i+1]
 			child := convertNode(valueNode, keyNode.Value, -1, depth+1, node.Path, node)
+			child.LineNumber = keyNode.Line // Use key's line, not value's line
 			node.Children = append(node.Children, child)
 		}
 
